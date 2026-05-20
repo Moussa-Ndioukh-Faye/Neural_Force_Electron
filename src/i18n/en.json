@@ -1,0 +1,90 @@
+{
+  "app": {
+    "title": "NeuralForge",
+    "subtitle": "AI coding assistant with multi-agent team",
+    "newConv": "+ New",
+    "settings": "Settings",
+    "darkMode": "Dark mode",
+    "lightMode": "Light mode",
+    "search": "Search...",
+    "copied": "Copied!",
+    "copyError": "Copy error",
+    "deleteConfirm": "Delete this conversation?",
+    "noConvs": "No conversations",
+    "emptyChat": "Start a conversation",
+    "emptyChatTeam": "Type @agent or pipeline:type to start",
+    "thinking": "NeuralForge is thinking...",
+    "send": "Send",
+    "welcomeBtn": "Start",
+    "close": "Close",
+    "save": "Save",
+    "delete": "Delete",
+    "rename": "Rename"
+  },
+  "modes": {
+    "single": "💬 Single",
+    "team": "👥 Team"
+  },
+  "settings": {
+    "title": "Settings",
+    "ollamaUrl": "Ollama URL",
+    "model": "Model",
+    "save": "Save",
+    "saved": "Setting saved",
+    "modelsAvailable": "model(s) available on Ollama",
+    "noModels": "No models found. Check that Ollama is running.",
+    "encrypted": "Data is encrypted with AES-256",
+    "immediate": "Changes take effect immediately",
+    "refresh": "Refresh list"
+  },
+  "placeholders": {
+    "message": "Message NeuralForge...",
+    "messageTeam": "@planner @executor @reviewer | pipeline:feature Create an API...",
+    "task": "Describe a task for the agents..."
+  },
+  "agents": {
+    "title": "NeuralForge Team",
+    "count": "agents",
+    "status": "Team Status",
+    "active": "Active",
+    "available": "Available",
+    "responses": "Responses",
+    "busy": "In progress",
+    "error": "Error",
+    "ready": "Ready"
+  },
+  "pipelines": {
+    "feature": "Feature",
+    "bugfix": "Bugfix",
+    "review": "Review",
+    "research": "Research"
+  },
+  "task": {
+    "plan": "Plan",
+    "code": "Code",
+    "review": "Review",
+    "debug": "Debug"
+  },
+  "welcome": {
+    "leader": "Coordination",
+    "planner": "Planning",
+    "executor": "Code",
+    "reviewer": "Review",
+    "researcher": "Research",
+    "debugger": "Debug",
+    "pipeline": "Run a complete pipeline"
+  },
+  "menu": {
+    "about": "🧠 NeuralForge v1.0.0",
+    "aboutDetail": "Multi-agent AI coding assistant powered by Ollama.\n\n6 core agents • 12 extended roles • Electron + React + TypeScript"
+  },
+  "export": {
+    "title": "Export conversation",
+    "success": "Conversation exported",
+    "error": "Export error"
+  },
+  "error": {
+    "generic": "An error occurred",
+    "ollama": "Check that Ollama is running"
+  }
+}

@@ -26,6 +26,7 @@ const api = {
   setSetting: (key: string, value: string) => ipcRenderer.invoke('set-setting', key, value),
   runCommand: (cmd: string) => ipcRenderer.invoke('run-command', cmd),
   getWorkspace: () => ipcRenderer.invoke('get-workspace'),
+  exportConversation: (id: string, format: 'md' | 'json' | 'txt') => ipcRenderer.invoke('export-conversation', id, format),
 };
 
 contextBridge.exposeInMainWorld('api', api);

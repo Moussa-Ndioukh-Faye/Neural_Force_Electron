@@ -1,0 +1,90 @@
+{
+  "app": {
+    "title": "NeuralForge",
+    "subtitle": "Assistant IA multi-agent avec Ollama",
+    "newConv": "+ Nouveau",
+    "settings": "Paramètres",
+    "darkMode": "Mode sombre",
+    "lightMode": "Mode clair",
+    "search": "Rechercher...",
+    "copied": "Copié !",
+    "copyError": "Erreur de copie",
+    "deleteConfirm": "Supprimer cette conversation ?",
+    "noConvs": "Aucune conversation",
+    "emptyChat": "Commencez la conversation",
+    "emptyChatTeam": "Tapez @agent ou pipeline:type pour commencer",
+    "thinking": "NeuralForge réfléchit...",
+    "send": "Envoyer",
+    "welcomeBtn": "Démarrer",
+    "close": "Fermer",
+    "save": "Sauvegarder",
+    "delete": "Supprimer",
+    "rename": "Renommer"
+  },
+  "modes": {
+    "single": "💬 Single",
+    "team": "👥 Team"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "ollamaUrl": "Ollama URL",
+    "model": "Modèle",
+    "save": "Sauvegarder",
+    "saved": "Paramètre sauvegardé",
+    "modelsAvailable": "modèle(s) disponible(s) sur Ollama",
+    "noModels": "Aucun modèle trouvé. Vérifiez qu'Ollama est lancé.",
+    "encrypted": "Les données sont chiffrées avec AES-256",
+    "immediate": "Les modifications prennent effet immédiatement",
+    "refresh": "Rafraîchir la liste"
+  },
+  "placeholders": {
+    "message": "Message NeuralForge...",
+    "messageTeam": "@planner @executor @reviewer | pipeline:feature Créer une API...",
+    "task": "Décrivez une tâche pour les agents..."
+  },
+  "agents": {
+    "title": "NeuralForge Team",
+    "count": "agents",
+    "status": "Team Status",
+    "active": "Actifs",
+    "available": "Disponibles",
+    "responses": "Réponses",
+    "busy": "En cours",
+    "error": "Erreur",
+    "ready": "Prêt"
+  },
+  "pipelines": {
+    "feature": "Feature",
+    "bugfix": "Bugfix",
+    "review": "Review",
+    "research": "Research"
+  },
+  "task": {
+    "plan": "Planifier",
+    "code": "Coder",
+    "review": "Review",
+    "debug": "Debug"
+  },
+  "welcome": {
+    "leader": "Coordination",
+    "planner": "Planification",
+    "executor": "Code",
+    "reviewer": "Review",
+    "researcher": "Recherche",
+    "debugger": "Debug",
+    "pipeline": "Lance un pipeline complet"
+  },
+  "menu": {
+    "about": "🧠 NeuralForge v1.0.0",
+    "aboutDetail": "Assistant IA multi-agent propulsé par Ollama.\n\n6 agents core • 12 rôles étendus • Electron + React + TypeScript"
+  },
+  "export": {
+    "title": "Exporter la conversation",
+    "success": "Conversation exportée",
+    "error": "Erreur d'exportation"
+  },
+  "error": {
+    "generic": "Une erreur est survenue",
+    "ollama": "Vérifiez qu'Ollama est démarré"
+  }
+}

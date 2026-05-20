@@ -209,6 +209,21 @@ function App() {
     setLoading(false);
   }
 
+  React.useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') { setSettingsOpen(false); return; }
+      if (!e.ctrlKey && !e.metaKey) return;
+      switch (e.key) {
+        case 'n': e.preventDefault(); newConv(); break;
+        case 'w': e.preventDefault(); setActiveId(''); setMsgs([]); break;
+        case ',': e.preventDefault(); setSettingsOpen(true); break;
+        case 'Enter': e.preventDefault(); if (!loading && input.trim()) send(); break;
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  });
+
   return React.createElement('div', { className: 'app' },
     React.createElement('div', {
       className: `sidebar-overlay ${sidebarOpen ? 'visible' : ''}`,
@@ -245,7 +260,16 @@ function App() {
               onClick: () => setMode('team')
             }, '👥 Team')
           ),
-          React.createElement('button', { className: 'new-chat-btn', onClick: newConv }, '+ New')
+          React.createElement('button', { className: 'new-chat-btn', onClick: newConv }, '+ New'),
+          activeId && React.createElement('button', {
+            className: 'export-btn',
+            onClick: async () => {
+              const r = await window.api.exportConversation(activeId, 'md');
+              if (r.success) showToast('Conversation exportée');
+              else showToast(r.error || "Erreur d'exportation", 'error');
+            },
+            title: 'Exporter'
+          }, '📥')
         ),
       React.createElement('button', { className: 'sidebar-close', onClick: () => setSidebarOpen(false) }, '✕'),
       React.createElement('div', { className: 'conversations-search' },

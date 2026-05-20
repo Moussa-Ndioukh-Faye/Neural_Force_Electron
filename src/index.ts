@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron';
 import Store from 'electron-store';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
@@ -139,6 +139,67 @@ function getAgentChatLabel(agentId: string): string {
 }
 
 const CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:* https://localhost:*; img-src 'self' data:; font-src 'self'";
+
+function createAppMenu() {
+  const template: Electron.MenuItemConstructorOptions[] = [
+    {
+      label: 'NeuralForge',
+      submenu: [
+        { role: 'about' },
+        { type: 'separator' },
+        { role: 'hide', label: 'Masquer' },
+        { role: 'hideOthers', label: 'Masquer les autres' },
+        { type: 'separator' },
+        { role: 'quit', label: 'Quitter' }
+      ]
+    },
+    {
+      label: 'Fichier',
+      submenu: [
+        { role: 'close', label: 'Fermer' }
+      ]
+    },
+    {
+      label: 'Édition',
+      submenu: [
+        { role: 'undo', label: 'Annuler' },
+        { role: 'redo', label: 'Rétablir' },
+        { type: 'separator' },
+        { role: 'cut', label: 'Couper' },
+        { role: 'copy', label: 'Copier' },
+        { role: 'paste', label: 'Coller' },
+        { role: 'selectAll', label: 'Tout sélectionner' }
+      ]
+    },
+    {
+      label: 'Affichage',
+      submenu: [
+        { role: 'reload', label: 'Recharger' },
+        { role: 'toggleDevTools', label: 'Outils développeur' },
+        { type: 'separator' },
+        { role: 'togglefullscreen', label: 'Plein écran' }
+      ]
+    },
+    {
+      label: 'Aide',
+      submenu: [
+        {
+          label: 'À propos de NeuralForge',
+          click: () => {
+            dialog.showMessageBox({
+              type: 'info', title: 'NeuralForge',
+              message: '🧠 NeuralForge v1.0.0',
+              detail: 'Multi-agent AI coding assistant powered by Ollama.\n\n6 core agents • 12 extended roles • Electron + React + TypeScript'
+            });
+          }
+        }
+      ]
+    }
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+}
 
 const createWindow = () => {
   const mainWindow = new BrowserWindow({
@@ -397,6 +458,54 @@ ipcMain.handle('run-command', async (_, cmd: string) => {
 
 ipcMain.handle('get-workspace', () => os.homedir() + '/NeuralForge/workspace');
 
-app.on('ready', createWindow);
+// === EXPORT CONVERSATION ===
+ipcMain.handle('export-conversation', async (_, conversationId: string, format: 'md' | 'json' | 'txt') => {
+  try {
+    const convs = store.get('conversations', []) as Conversation[];
+    const conv = convs.find(c => c.id === conversationId);
+    if (!conv) throw new Error('Conversation not found');
+
+    let content = '';
+    const ext = format === 'md' ? 'md' : format === 'json' ? 'json' : 'txt';
+
+    if (format === 'json') {
+      content = JSON.stringify(conv.messages, null, 2);
+    } else {
+      const lines: string[] = [];
+      lines.push(`# ${conv.title}`);
+      lines.push(`Date: ${new Date(conv.created_at).toLocaleDateString()}`);
+      lines.push(`Mode: ${conv.mode}`);
+      lines.push('---\n');
+      for (const msg of conv.messages) {
+        const role = msg.role === 'user' ? '👤 User' : '🤖 Assistant';
+        lines.push(`### ${role} (${new Date(msg.timestamp).toLocaleString()})`);
+        lines.push('');
+        lines.push(msg.content);
+        lines.push('');
+        lines.push('---');
+        lines.push('');
+      }
+      content = lines.join('\n');
+    }
+
+    const result = await dialog.showSaveDialog({
+      title: 'Exporter la conversation',
+      defaultPath: `${conv.title.replace(/[^a-z0-9]/gi, '_')}.${ext}`,
+      filters: [
+        { name: 'Markdown', extensions: ['md'] },
+        { name: 'JSON', extensions: ['json'] },
+        { name: 'Texte', extensions: ['txt'] }
+      ]
+    });
+
+    if (result.canceled || !result.filePath) return { success: false };
+    fs.writeFileSync(result.filePath, content, 'utf-8');
+    return { success: true, path: result.filePath };
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+});
+
+app.on('ready', () => { createAppMenu(); createWindow(); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
