@@ -1,9 +1,11 @@
-import { app, BrowserWindow, ipcMain, dialog, BrowserWindowConstructorOptions } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import Store from 'electron-store';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
-import { agentSystem, AgentInfo } from '../models/scripts/agents';
+import * as os from 'os';
+import { exec } from 'child_process';
+import { agentSystem } from '../models/scripts/agents';
 
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
@@ -76,9 +78,8 @@ agentSystem.model = settings.model;
 
 async function ollamaChat(model: string, messages: { role: string; content: string }[], system?: string): Promise<string> {
   try {
-    const body: any = { model, stream: false };
+    const body = { model, stream: false, messages } as Record<string, unknown>;
     if (system) body.system = system;
-    body.messages = messages;
 
     const res = await fetch(`${agentSystem.ollamaUrl}/api/chat`, {
       method: 'POST',
@@ -87,19 +88,20 @@ async function ollamaChat(model: string, messages: { role: string; content: stri
     });
 
     if (!res.ok) throw new Error(`Ollama error: ${res.status}`);
-    const data = await res.json();
-    return data.message?.content || 'No response';
-  } catch (e: any) {
-    return `❌ Ollama: ${e.message}. Vérifiez qu'Ollama est démarré (ollama serve)`;
+    const data = await res.json() as Record<string, unknown>;
+    const msg = data.message as Record<string, unknown> | undefined;
+    return (msg?.content as string) || 'No response';
+  } catch (e) {
+    const err = e as Error;
+    return `❌ Ollama: ${err.message}. Vérifiez qu'Ollama est démarré (ollama serve)`;
   }
 }
 
 async function* ollamaChatStream(model: string, messages: { role: string; content: string }[], system?: string): AsyncGenerator<string> {
-  const body: any = { model, stream: true };
-  if (system) body.system = system;
-  body.messages = messages;
+  const body = { model, stream: true, messages } as Record<string, unknown>;
+    if (system) body.system = system;
 
-  const res = await fetch(`${agentSystem.ollamaUrl}/api/chat`, {
+    const res = await fetch(`${agentSystem.ollamaUrl}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
@@ -167,10 +169,10 @@ const createWindow = () => {
 
 ipcMain.handle('get-conversations', () => {
   try {
-    return store.get('conversations', []).map((c: Conversation) => ({
+    return (store.get('conversations', []) as Conversation[]).map((c: Conversation) => ({
       id: c.id, title: c.title, created_at: c.created_at, updated_at: c.updated_at, mode: c.mode
     }));
-  } catch (e: any) {
+  } catch {
     return [];
   }
 });
@@ -184,7 +186,7 @@ ipcMain.handle('create-conversation', (_, title: string, mode: 'single' | 'team'
     const convs = store.get('conversations', []);
     store.set('conversations', [conv, ...convs]);
     return conv;
-  } catch (e: any) {
+  } catch {
     return null;
   }
 });
@@ -193,7 +195,7 @@ ipcMain.handle('delete-conversation', (_, id: string) => {
   try {
     const convs = store.get('conversations', []);
     store.set('conversations', convs.filter((c: Conversation) => c.id !== id));
-  } catch (e: any) { }
+  } catch { }
 });
 
 ipcMain.handle('rename-conversation', (_, id: string, title: string) => {
@@ -203,7 +205,7 @@ ipcMain.handle('rename-conversation', (_, id: string, title: string) => {
     if (idx === -1) return;
     convs[idx].title = title;
     store.set('conversations', convs);
-  } catch (e: any) { }
+  } catch { }
 });
 
 ipcMain.handle('get-messages', (_, conversationId: string) => {
@@ -211,7 +213,7 @@ ipcMain.handle('get-messages', (_, conversationId: string) => {
     const convs = store.get('conversations', []);
     const conv = convs.find((c: Conversation) => c.id === conversationId);
     return conv ? conv.messages : [];
-  } catch (e: any) {
+  } catch {
     return [];
   }
 });
@@ -227,7 +229,7 @@ ipcMain.handle('add-message', (_, conversationId: string, role: string, content:
     convs[idx].updated_at = new Date().toISOString();
     store.set('conversations', convs);
     return msg;
-  } catch (e: any) {
+  } catch {
     return null;
   }
 });
@@ -278,10 +280,10 @@ ipcMain.handle('chat', async (_, messages: Message[], mode: 'single' | 'team' = 
     ]);
     return { id: generateId(), role: 'assistant', content: response, timestamp: new Date().toISOString() };
 
-  } catch (e: any) {
+  } catch (e) {
     return {
       id: generateId(), role: 'assistant',
-      content: `❌ Erreur: ${e.message}`,
+      content: `❌ Erreur: ${(e as Error).message}`,
       timestamp: new Date().toISOString()
     };
   }
@@ -291,7 +293,6 @@ ipcMain.handle('chat', async (_, messages: Message[], mode: 'single' | 'team' = 
 ipcMain.on('chat-stream', async (event, messages: Message[], mode: 'single' | 'team' = 'single') => {
   try {
     if (mode === 'team') {
-      const userMsg = messages[messages.length - 1]?.content || '';
       const response = await ollamaChat(agentSystem.model, [
         { role: 'system', content: 'You are NeuralForge, an AI coding assistant. Help users write, debug, and understand code.' },
         ...messages.map(m => ({ role: m.role, content: m.content }))
@@ -310,8 +311,8 @@ ipcMain.on('chat-stream', async (event, messages: Message[], mode: 'single' | 't
       event.sender.send('chat:chunk', { type: 'token', content: token });
     }
     event.sender.send('chat:chunk', { type: 'done' });
-  } catch (e: any) {
-    event.sender.send('chat:chunk', { type: 'error', content: e.message });
+  } catch (e) {
+    event.sender.send('chat:chunk', { type: 'error', content: (e as Error).message });
   }
 });
 
@@ -324,16 +325,16 @@ ipcMain.handle('agent-task', async (_, agent: string, task: string) => {
   try {
     const result = await agentSystem.delegateTask(agent, task);
     return { success: true, agent, result };
-  } catch (e: any) {
-    return { success: false, agent, error: e.message };
+  } catch (e) {
+    return { success: false, agent, error: (e as Error).message };
   }
 });
 
 ipcMain.handle('run-pipeline', async (_, type: string, task: string) => {
   try {
     return await agentSystem.runPipeline(type, task);
-  } catch (e: any) {
-    return { agentId: 'pipeline', response: `❌ Erreur pipeline: ${e.message}`, pipeline: type };
+  } catch (e) {
+    return { agentId: 'pipeline', response: `❌ Erreur pipeline: ${(e as Error).message}`, pipeline: type };
   }
 });
 
@@ -347,7 +348,7 @@ ipcMain.handle('get-ollama-models', async () => {
     const res = await fetch(`${agentSystem.ollamaUrl}/api/tags`, { method: 'GET', signal: AbortSignal.timeout(5000) });
     if (!res.ok) return [];
     const data = await res.json();
-    return (data.models || []).map((m: any) => m.name);
+    return (data.models || []).map((m: { name: string }) => m.name);
   } catch {
     return [];
   }
@@ -356,23 +357,22 @@ ipcMain.handle('get-ollama-models', async () => {
 // === SETTINGS ===
 ipcMain.handle('get-setting', (_, key: string) => {
   try {
-    const s = store.get('settings', {}) as any;
+    const s = store.get('settings', {}) as Record<string, string>;
     return s[key] || null;
   } catch { return null; }
 });
 
 ipcMain.handle('set-setting', (_, key: string, value: string) => {
   try {
-    const s = store.get('settings', {}) as any;
+    const s = store.get('settings', {}) as Record<string, string>;
     s[key] = value;
     store.set('settings', s);
     if (key === 'ollamaUrl') agentSystem.ollamaUrl = value;
     if (key === 'model') agentSystem.model = value;
-  } catch (e: any) { }
+  } catch { }
 });
 
 // === SANDBOXED COMMAND EXECUTION ===
-const ALLOWED_COMMANDS = ['git', 'npm', 'node', 'python', 'pip', 'ls', 'dir', 'cat', 'type', 'echo', 'cd'];
 const BLOCKED_PATTERNS = [/rm\s+-rf/i, /del\s+\/f/i, /format/i, /shutdown/i, /net\s+user/i, /rd\s+\/s/i];
 
 function isCommandSafe(cmd: string): { safe: boolean; reason?: string } {
@@ -388,15 +388,14 @@ ipcMain.handle('run-command', async (_, cmd: string) => {
     return { success: false, output: '', error: check.reason };
   }
 
-  const { exec } = require('child_process');
   return new Promise(resolve => {
-    exec(cmd, { timeout: 10000 }, (err: any, stdout: string, stderr: string) => {
+    exec(cmd, { timeout: 10000 }, (err: Error | null, stdout: string, stderr: string) => {
       resolve({ success: !err, output: stdout || '', error: stderr || err?.message || '' });
     });
   });
 });
 
-ipcMain.handle('get-workspace', () => require('os').homedir() + '/NeuralForge/workspace');
+ipcMain.handle('get-workspace', () => os.homedir() + '/NeuralForge/workspace');
 
 app.on('ready', createWindow);
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

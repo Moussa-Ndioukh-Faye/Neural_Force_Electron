@@ -20,13 +20,8 @@ export function SettingsModal({ open, onClose, settings, onSave }: Props) {
   const [saved, setSaved] = React.useState(false);
 
   React.useEffect(() => {
-    if (open) {
-      setOllamaUrl(settings.ollamaUrl);
-      setModel(settings.model);
-      setSaved(false);
-      loadModels();
-    }
-  }, [open, settings.ollamaUrl, settings.model]);
+    loadModels();
+  }, [open]);
 
   async function loadModels() {
     setLoading(true);

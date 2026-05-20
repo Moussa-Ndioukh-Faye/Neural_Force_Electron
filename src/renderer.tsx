@@ -30,9 +30,9 @@ function formatTime(ts: string): string {
 }
 
 function App() {
-  const [convs, setConvs] = React.useState<any[]>([]);
+  const [convs, setConvs] = React.useState<Record<string, unknown>[]>([]);
   const [activeId, setActiveId] = React.useState<string | null>(null);
-  const [msgs, setMsgs] = React.useState<any[]>([]);
+  const [msgs, setMsgs] = React.useState<Record<string, unknown>[]>([]);
   const [input, setInput] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [mode, setMode] = React.useState<'single' | 'team'>('single');
@@ -154,8 +154,8 @@ function App() {
         const resp = await window.api.chat([...msgs, userMsg], mode);
         setMsgs(prev => [...prev, resp]);
         await window.api.addMessage(activeId, 'assistant', resp.content);
-      } catch (e: any) {
-        setMsgs(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: `❌ Erreur: ${e.message}`, timestamp: new Date().toISOString() }]);
+      } catch (e) {
+        setMsgs(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: `❌ Erreur: ${(e as Error).message}`, timestamp: new Date().toISOString() }]);
       }
       setLoading(false);
       return;
@@ -191,8 +191,8 @@ function App() {
     try {
       const res = await window.api.agentTask(agent, taskInput);
       setTaskResult(res.success ? res.result : `❌ ${res.error}`);
-    } catch (e: any) {
-      setTaskResult(`❌ ${e.message}`);
+    } catch (e) {
+      setTaskResult(`❌ ${(e as Error).message}`);
     }
     setLoading(false);
   }
@@ -203,13 +203,11 @@ function App() {
     try {
       const res = await window.api.runPipeline(type, taskInput);
       setTaskResult(res.response);
-    } catch (e: any) {
-      setTaskResult(`❌ ${e.message}`);
+    } catch (e) {
+      setTaskResult(`❌ ${(e as Error).message}`);
     }
     setLoading(false);
   }
-
-  const activeAgent = (id: string) => agents.find(a => a.id === id);
 
   return React.createElement('div', { className: 'app' },
     React.createElement('div', {
@@ -454,6 +452,7 @@ function App() {
     ),
 
     React.createElement(SettingsModal, {
+      key: settingsOpen ? 'open' : 'closed',
       open: settingsOpen,
       onClose: () => setSettingsOpen(false),
       settings,

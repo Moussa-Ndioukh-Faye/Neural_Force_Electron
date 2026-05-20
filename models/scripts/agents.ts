@@ -42,7 +42,7 @@ class Agent extends EventEmitter {
       this.emit('status-change', this.getSnapshot());
 
       return response;
-    } catch (error: any) {
+    } catch (error) {
       this.status = 'error';
       this.emit('status-change', this.getSnapshot());
       setTimeout(() => {
@@ -71,9 +71,8 @@ class Agent extends EventEmitter {
 
 async function ollamaChat(ollamaUrl: string, model: string, userMessage: string, system?: string): Promise<string> {
   try {
-    const body: any = { model, stream: false };
+    const body = { model, stream: false, messages: [{ role: 'user', content: userMessage }] } as Record<string, unknown>;
     if (system) body.system = system;
-    body.messages = [{ role: 'user', content: userMessage }];
 
     const res = await fetch(`${ollamaUrl}/api/chat`, {
       method: 'POST',
@@ -84,8 +83,8 @@ async function ollamaChat(ollamaUrl: string, model: string, userMessage: string,
     if (!res.ok) throw new Error(`Ollama error: ${res.status}`);
     const data = await res.json();
     return data.message?.content || 'No response';
-  } catch (e: any) {
-    throw new Error(`Ollama: ${e.message}`);
+  } catch (e) {
+    throw new Error(`Ollama: ${(e as Error).message}`);
   }
 }
 
@@ -106,8 +105,8 @@ function formatPipelineHeader(pipelineType: string, steps: string[]): string {
 
 export class MultiAgentSystem extends EventEmitter {
   private agents: Map<string, Agent> = new Map();
-  public ollamaUrl: string = 'http://localhost:11434';
-  public model: string = 'qwen2.5-coder';
+  public ollamaUrl = 'http://localhost:11434';
+  public model = 'qwen2.5-coder';
 
   constructor() {
     super();
@@ -166,8 +165,8 @@ export class MultiAgentSystem extends EventEmitter {
       try {
         const response = await this.delegateTask(role, taskDescription);
         result += formatAgentHeader(role) + response + '\n\n---\n\n';
-      } catch (e: any) {
-        result += formatAgentHeader(role) + `❌ Erreur: ${e.message}\n\n---\n\n`;
+      } catch (e) {
+        result += formatAgentHeader(role) + `❌ Erreur: ${(e as Error).message}\n\n---\n\n`;
       }
     }
 

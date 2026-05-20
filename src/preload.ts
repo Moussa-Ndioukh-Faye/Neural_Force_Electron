@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
-type ChunkCallback = (data: { type: 'token' | 'done' | 'error'; content?: string }) => void;
+type ChunkData = { type: 'token' | 'done' | 'error'; content?: string };
+type ChunkCallback = (data: ChunkData) => void;
 
 const api = {
   getConversations: () => ipcRenderer.invoke('get-conversations'),
@@ -9,10 +10,10 @@ const api = {
   renameConversation: (id: string, title: string) => ipcRenderer.invoke('rename-conversation', id, title),
   getMessages: (id: string) => ipcRenderer.invoke('get-messages', id),
   addMessage: (convId: string, role: string, content: string) => ipcRenderer.invoke('add-message', convId, role, content),
-  chat: (messages: any[], mode?: string) => ipcRenderer.invoke('chat', messages, mode),
-  startChatStream: (messages: any[], mode: string) => ipcRenderer.send('chat-stream', messages, mode),
+  chat: (messages: Record<string, unknown>[], mode?: string) => ipcRenderer.invoke('chat', messages, mode),
+  startChatStream: (messages: Record<string, unknown>[], mode: string) => ipcRenderer.send('chat-stream', messages, mode),
   onChatChunk: (callback: ChunkCallback) => {
-    const handler = (_: any, data: any) => callback(data);
+    const handler = (_: unknown, data: ChunkData) => callback(data);
     ipcRenderer.on('chat:chunk', handler);
     return () => ipcRenderer.removeListener('chat:chunk', handler);
   },
