@@ -1,5 +1,6 @@
 import * as React from 'react';
 import * as ReactDOM from 'react-dom/client';
+import { FixedSizeList } from 'react-window';
 import './index.css';
 import { ErrorBoundary } from './ErrorBoundary';
 import { MarkdownMessage } from './MarkdownMessage';
@@ -72,27 +73,33 @@ function App() {
     window.api.setSetting('theme', next ? 'dark' : 'light');
   }
 
-  React.useEffect(() => {
-    loadConvs();
-    loadAgents();
-    loadSettings();
-  }, []);
-
-  async function loadSettings() {
-    try {
-      const url = await window.api.getSetting('ollamaUrl');
-      const model = await window.api.getSetting('model');
-      setSettings({
-        ollamaUrl: url || 'http://localhost:11434',
-        model: model || 'qwen2.5-coder'
-      });
-      const theme = await window.api.getSetting('theme');
-      if (theme === 'light' || theme === 'dark') {
-        setDarkMode(theme === 'dark');
-        document.documentElement.setAttribute('data-theme', theme);
-      }
-    } catch { }
+  function handleKeyDown(e: KeyboardEvent) {
+    if (e.key === 'Escape') { setSettingsOpen(false); return; }
+    if (!e.ctrlKey && !e.metaKey) return;
+    switch (e.key) {
+      case 'n': e.preventDefault(); newConv(); break;
+      case 'w': e.preventDefault(); setActiveId(''); setMsgs([]); break;
+      case ',': e.preventDefault(); setSettingsOpen(true); break;
+      case 'Enter': e.preventDefault(); if (!loading && input.trim()) send(); break;
+    }
   }
+
+  React.useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  });
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const theme = await window.api.getSetting('theme');
+        if (theme === 'light' || theme === 'dark') {
+          setDarkMode(theme === 'dark');
+          document.documentElement.setAttribute('data-theme', theme);
+        }
+      } catch { }
+    })();
+  }, []);
 
   React.useEffect(() => {
     if (!messagesRef.current) return;
@@ -225,6 +232,23 @@ function App() {
   });
 
   const [dragging, setDragging] = React.useState(false);
+  const conversationsRef = React.useRef<HTMLDivElement>(null);
+  const [listHeight, setListHeight] = React.useState(400);
+  const filteredConvs = React.useMemo(() =>
+    convs.filter(c => c.title.toLowerCase().includes(searchQuery.toLowerCase())),
+    [convs, searchQuery]
+  );
+
+  React.useLayoutEffect(() => {
+    if (!conversationsRef.current) return;
+    const ro = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        setListHeight(entry.contentRect.height);
+      }
+    });
+    ro.observe(conversationsRef.current);
+    return () => ro.disconnect();
+  }, []);
 
   function handleDragOver(e: React.DragEvent) {
     e.preventDefault();
@@ -265,9 +289,14 @@ function App() {
     React.createElement('button', {
       className: `hamburger ${sidebarOpen ? 'hidden' : ''}`,
       onClick: () => setSidebarOpen(true),
-      title: 'Ouvrir le menu'
+      title: 'Ouvrir le menu',
+      'aria-label': 'Ouvrir le menu'
     }, '☰'),
-    React.createElement('aside', { className: `sidebar ${sidebarOpen ? '' : 'collapsed'}`, },
+    React.createElement('aside', {
+      className: `sidebar ${sidebarOpen ? '' : 'collapsed'}`,
+      role: 'complementary',
+      'aria-label': 'Conversations'
+    },
         React.createElement('div', { className: 'sidebar-header' },
           React.createElement('div', { className: 'logo' },
             React.createElement('div', { className: 'logo-icon' }, '🧠'),
@@ -313,54 +342,64 @@ function App() {
           placeholder: '🔍 Rechercher...'
         })
       ),
-      React.createElement('div', { className: 'conversations-list' },
-        convs.filter(c => c.title.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && React.createElement('div', { className: 'empty-sidebar' }, 'Aucune conversation'),
-        convs.filter(c => c.title.toLowerCase().includes(searchQuery.toLowerCase())).map(c => {
-          const isRenaming = renamingId === c.id;
-          return React.createElement('div', {
-            key: c.id,
-            className: activeId === c.id ? 'conversation-item active' : 'conversation-item',
-            onClick: () => { setActiveId(c.id); loadMsgs(c.id); setMode(c.mode || 'single'); },
-            onDoubleClick: () => {
-              setRenamingId(c.id);
-              setRenameValue(c.title);
-              setTimeout(() => renameInputRef.current?.focus(), 50);
-            }
-          },
-            React.createElement('span', { className: 'conv-icon' }, c.mode === 'team' ? '👥' : '💬'),
-            isRenaming ?
-              React.createElement('input', {
-                ref: renameInputRef,
-                className: 'conv-rename-input',
-                value: renameValue,
-                onChange: e => setRenameValue(e.target.value),
-                onBlur: async () => {
-                  if (renameValue.trim() && renameValue !== c.title) {
-                    await window.api.renameConversation(c.id, renameValue.trim());
-                    setConvs(prev => prev.map(x => x.id === c.id ? { ...x, title: renameValue.trim() } : x));
-                  }
-                  setRenamingId(null);
+      React.createElement('div', { className: 'conversations-list', ref: conversationsRef },
+        filteredConvs.length === 0 && React.createElement('div', { className: 'empty-sidebar' }, 'Aucune conversation'),
+        filteredConvs.length > 0 && React.createElement(FixedSizeList, {
+          height: listHeight,
+          itemCount: filteredConvs.length,
+          itemSize: 60,
+          width: '100%',
+          style: { overflow: 'hidden auto' }
+        },
+          ({ index, style }: { index: number; style: React.CSSProperties }) => {
+            const c = filteredConvs[index];
+            const isRenaming = renamingId === c.id;
+            return React.createElement('div', {
+              style,
+              className: activeId === c.id ? 'conversation-item active' : 'conversation-item',
+              onClick: () => { setActiveId(c.id); loadMsgs(c.id); setMode(c.mode || 'single'); },
+              onDoubleClick: () => {
+                setRenamingId(c.id);
+                setRenameValue(c.title);
+                setTimeout(() => renameInputRef.current?.focus(), 50);
+              }
+            },
+              React.createElement('span', { className: 'conv-icon' }, c.mode === 'team' ? '👥' : '💬'),
+              isRenaming ?
+                React.createElement('input', {
+                  ref: renameInputRef,
+                  className: 'conv-rename-input',
+                  value: renameValue,
+                  onChange: e => setRenameValue(e.target.value),
+                  onBlur: async () => {
+                    if (renameValue.trim() && renameValue !== c.title) {
+                      await window.api.renameConversation(c.id, renameValue.trim());
+                      setConvs(prev => prev.map(x => x.id === c.id ? { ...x, title: renameValue.trim() } : x));
+                    }
+                    setRenamingId(null);
+                  },
+                  onKeyDown: e => {
+                    if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                    if (e.key === 'Escape') setRenamingId(null);
+                  },
+                  onClick: e => e.stopPropagation()
+                }) :
+                React.createElement('span', { className: 'conv-title' }, c.title),
+              React.createElement('button', {
+                className: 'conv-delete-btn',
+                onClick: async e => {
+                  e.stopPropagation();
+                  if (!confirm('Supprimer cette conversation ?')) return;
+                  await window.api.deleteConversation(c.id);
+                  setConvs(prev => prev.filter(x => x.id !== c.id));
+                  if (activeId === c.id) { setActiveId(''); setMsgs([]); }
                 },
-                onKeyDown: e => {
-                  if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                  if (e.key === 'Escape') setRenamingId(null);
-                },
-                onClick: e => e.stopPropagation()
-              }) :
-              React.createElement('span', { className: 'conv-title' }, c.title),
-            React.createElement('button', {
-              className: 'conv-delete-btn',
-              onClick: async e => {
-                e.stopPropagation();
-                if (!confirm('Supprimer cette conversation ?')) return;
-                await window.api.deleteConversation(c.id);
-                setConvs(prev => prev.filter(x => x.id !== c.id));
-                if (activeId === c.id) { setActiveId(''); setMsgs([]); }
-              },
-              title: 'Supprimer'
-            }, '×')
-          );
-        })
+                title: 'Supprimer',
+                'aria-label': `Supprimer ${c.title}`
+              }, '×')
+            );
+          }
+        )
       )
     ),
 
@@ -387,7 +426,7 @@ function App() {
           React.createElement('button', { className: 'welcome-btn', onClick: newConv }, 'Start')
         ) :
         React.createElement(React.Fragment, null,
-          React.createElement('div', { className: 'messages', ref: messagesRef },
+          React.createElement('div', { className: 'messages', ref: messagesRef, role: 'log', 'aria-label': 'Messages', 'aria-live': 'polite' },
             msgs.length === 0 && React.createElement('div', { className: 'empty-chat' },
               mode === 'team' ? '👥 Tapez @agent ou pipeline:type pour commencer' : '💬 Commencez la conversation'
             ),
@@ -435,7 +474,7 @@ function App() {
               disabled: loading,
               rows: 2
             }),
-            React.createElement('button', { onClick: send, disabled: loading || !input.trim() }, 'Envoyer')
+            React.createElement('button', { onClick: send, disabled: loading || !input.trim(), 'aria-label': 'Envoyer le message' }, 'Envoyer')
           ),
           mode === 'team' && React.createElement('div', { className: 'quick-actions' },
             QUICK_ACTIONS.map((q, i) =>
@@ -526,6 +565,8 @@ function App() {
 
     toast && React.createElement('div', {
       className: `toast toast-${toast.type}`,
+      role: 'status',
+      'aria-live': 'polite',
       onClick: () => setToast(null)
     }, toast.message)
   );
