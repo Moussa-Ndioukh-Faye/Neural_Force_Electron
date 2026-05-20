@@ -44,10 +44,12 @@ function App() {
   const [renamingId, setRenamingId] = React.useState<string | null>(null);
   const [renameValue, setRenameValue] = React.useState("");
   const [toast, setToast] = React.useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [sidebarOpen, setSidebarOpen] = React.useState(true);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [darkMode, setDarkMode] = React.useState(true);
   const renameInputRef = React.useRef<HTMLInputElement>(null);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  const messagesRef = React.useRef<HTMLDivElement>(null);
   const toastTimer = React.useRef<ReturnType<typeof setTimeout>>();
 
   function showToast(message: string, type: 'success' | 'error' = 'success') {
@@ -93,7 +95,12 @@ function App() {
   }
 
   React.useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!messagesRef.current) return;
+    const el = messagesRef.current;
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
+    if (isNearBottom) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [msgs]);
 
   async function loadConvs() {
@@ -178,7 +185,16 @@ function App() {
   const activeAgent = (id: string) => agents.find(a => a.id === id);
 
   return React.createElement('div', { className: 'app' },
-    React.createElement('aside', { className: 'sidebar' },
+    React.createElement('div', {
+      className: `sidebar-overlay ${sidebarOpen ? 'visible' : ''}`,
+      onClick: () => setSidebarOpen(false)
+    }),
+    React.createElement('button', {
+      className: `hamburger ${sidebarOpen ? 'hidden' : ''}`,
+      onClick: () => setSidebarOpen(true),
+      title: 'Ouvrir le menu'
+    }, '☰'),
+    React.createElement('aside', { className: `sidebar ${sidebarOpen ? '' : 'collapsed'}`, },
         React.createElement('div', { className: 'sidebar-header' },
           React.createElement('div', { className: 'logo' },
             React.createElement('div', { className: 'logo-icon' }, '🧠'),
@@ -206,6 +222,7 @@ function App() {
           ),
           React.createElement('button', { className: 'new-chat-btn', onClick: newConv }, '+ New')
         ),
+      React.createElement('button', { className: 'sidebar-close', onClick: () => setSidebarOpen(false) }, '✕'),
       React.createElement('div', { className: 'conversations-search' },
         React.createElement('input', {
           className: 'conv-search-input',
@@ -283,7 +300,7 @@ function App() {
           React.createElement('button', { className: 'welcome-btn', onClick: newConv }, 'Start')
         ) :
         React.createElement(React.Fragment, null,
-          React.createElement('div', { className: 'messages' },
+          React.createElement('div', { className: 'messages', ref: messagesRef },
             msgs.length === 0 && React.createElement('div', { className: 'empty-chat' },
               mode === 'team' ? '👥 Tapez @agent ou pipeline:type pour commencer' : '💬 Commencez la conversation'
             ),
