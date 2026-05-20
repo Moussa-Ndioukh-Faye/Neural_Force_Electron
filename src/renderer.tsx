@@ -224,6 +224,39 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   });
 
+  const [dragging, setDragging] = React.useState(false);
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragging(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragging(false);
+  }
+
+  async function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (!file || !activeId) return;
+    try {
+      const result = await window.api.readFile(file.path);
+      if (result.success) {
+        setInput(prev => prev + `\n\`\`\`\n// ${result.name}\n${result.content}\n\`\`\`\n`);
+        showToast(`📎 ${result.name} ajouté`);
+      } else {
+        showToast(`Erreur: ${result.error}`, 'error');
+      }
+    } catch {
+      showToast('Erreur de lecture du fichier', 'error');
+    }
+  }
+
   return React.createElement('div', { className: 'app' },
     React.createElement('div', {
       className: `sidebar-overlay ${sidebarOpen ? 'visible' : ''}`,
@@ -331,7 +364,12 @@ function App() {
       )
     ),
 
-    React.createElement('main', { className: 'chat-area' },
+    React.createElement('main', {
+      className: `chat-area${dragging ? ' drag-over' : ''}`,
+      onDragOver: handleDragOver,
+      onDragLeave: handleDragLeave,
+      onDrop: handleDrop
+    },
       !activeId ?
         React.createElement('div', { className: 'welcome' },
           React.createElement('div', { className: 'welcome-icon' }, '🧠'),

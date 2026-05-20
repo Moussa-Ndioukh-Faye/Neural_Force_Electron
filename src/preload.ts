@@ -27,6 +27,7 @@ const api = {
   runCommand: (cmd: string) => ipcRenderer.invoke('run-command', cmd),
   getWorkspace: () => ipcRenderer.invoke('get-workspace'),
   exportConversation: (id: string, format: 'md' | 'json' | 'txt') => ipcRenderer.invoke('export-conversation', id, format),
+  readFile: (filePath: string) => ipcRenderer.invoke('read-file', filePath),
 };
 
 contextBridge.exposeInMainWorld('api', api);

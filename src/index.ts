@@ -506,6 +506,17 @@ ipcMain.handle('export-conversation', async (_, conversationId: string, format: 
   }
 });
 
+// === READ FILE ===
+ipcMain.handle('read-file', async (_, filePath: string) => {
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const name = path.basename(filePath);
+    return { success: true, name, content };
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+});
+
 app.on('ready', () => { createAppMenu(); createWindow(); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
