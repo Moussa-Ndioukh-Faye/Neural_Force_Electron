@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, BrowserWindowConstructorOptions } from 'electron';
 import Store from 'electron-store';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
@@ -91,6 +91,41 @@ async function ollamaChat(model: string, messages: { role: string; content: stri
     return data.message?.content || 'No response';
   } catch (e: any) {
     return `❌ Ollama: ${e.message}. Vérifiez qu'Ollama est démarré (ollama serve)`;
+  }
+}
+
+async function* ollamaChatStream(model: string, messages: { role: string; content: string }[], system?: string): AsyncGenerator<string> {
+  const body: any = { model, stream: true };
+  if (system) body.system = system;
+  body.messages = messages;
+
+  const res = await fetch(`${agentSystem.ollamaUrl}/api/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) throw new Error(`Ollama error: ${res.status}`);
+  if (!res.body) throw new Error('No response body');
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const parsed = JSON.parse(line);
+        if (parsed.done) return;
+        if (parsed.message?.content) yield parsed.message.content;
+      } catch { }
+    }
   }
 }
 
@@ -249,6 +284,34 @@ ipcMain.handle('chat', async (_, messages: Message[], mode: 'single' | 'team' = 
       content: `❌ Erreur: ${e.message}`,
       timestamp: new Date().toISOString()
     };
+  }
+});
+
+// === CHAT STREAMING ===
+ipcMain.on('chat-stream', async (event, messages: Message[], mode: 'single' | 'team' = 'single') => {
+  try {
+    if (mode === 'team') {
+      const userMsg = messages[messages.length - 1]?.content || '';
+      const response = await ollamaChat(agentSystem.model, [
+        { role: 'system', content: 'You are NeuralForge, an AI coding assistant. Help users write, debug, and understand code.' },
+        ...messages.map(m => ({ role: m.role, content: m.content }))
+      ]);
+      event.sender.send('chat:chunk', { type: 'token', content: response });
+      event.sender.send('chat:chunk', { type: 'done' });
+      return;
+    }
+
+    const stream = ollamaChatStream(agentSystem.model, [
+      { role: 'system', content: 'You are NeuralForge, an AI coding assistant. Help users write, debug, and understand code. Be concise and practical.' },
+      ...messages.map(m => ({ role: m.role, content: m.content }))
+    ]);
+
+    for await (const token of stream) {
+      event.sender.send('chat:chunk', { type: 'token', content: token });
+    }
+    event.sender.send('chat:chunk', { type: 'done' });
+  } catch (e: any) {
+    event.sender.send('chat:chunk', { type: 'error', content: e.message });
   }
 });
 

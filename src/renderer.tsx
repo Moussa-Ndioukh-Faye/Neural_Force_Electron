@@ -147,15 +147,42 @@ function App() {
     setMsgs(prev => [...prev, userMsg]);
     setInput("");
     setLoading(true);
-    try {
-      await window.api.addMessage(activeId, 'user', userMsg.content);
-      const resp = await window.api.chat([...msgs, userMsg], mode);
-      setMsgs(prev => [...prev, resp]);
-      await window.api.addMessage(activeId, 'assistant', resp.content);
-    } catch (e: any) {
-      setMsgs(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: `❌ Erreur: ${e.message}`, timestamp: new Date().toISOString() }]);
+    await window.api.addMessage(activeId, 'user', userMsg.content);
+
+    if (mode === 'team') {
+      try {
+        const resp = await window.api.chat([...msgs, userMsg], mode);
+        setMsgs(prev => [...prev, resp]);
+        await window.api.addMessage(activeId, 'assistant', resp.content);
+      } catch (e: any) {
+        setMsgs(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: `❌ Erreur: ${e.message}`, timestamp: new Date().toISOString() }]);
+      }
+      setLoading(false);
+      return;
     }
-    setLoading(false);
+
+    const streamId = `stream-${Date.now()}`;
+    const streamMsg = { id: streamId, role: 'assistant', content: '', timestamp: new Date().toISOString(), streaming: true };
+    setMsgs(prev => [...prev, streamMsg]);
+    let fullContent = '';
+
+    const cleanup = window.api.onChatChunk((data) => {
+      if (data.type === 'token') {
+        fullContent += data.content;
+        setMsgs(prev => prev.map(m => m.id === streamId ? { ...m, content: fullContent } : m));
+      } else if (data.type === 'done') {
+        setMsgs(prev => prev.map(m => m.id === streamId ? { ...m, streaming: false, content: fullContent } : m));
+        window.api.addMessage(activeId, 'assistant', fullContent);
+        setLoading(false);
+        cleanup();
+      } else if (data.type === 'error') {
+        setMsgs(prev => prev.map(m => m.id === streamId ? { ...m, content: `❌ Erreur: ${data.content}`, streaming: false } : m));
+        setLoading(false);
+        cleanup();
+      }
+    });
+
+    window.api.startChatStream([...msgs, userMsg], mode);
   }
 
   async function runTask(agent: string) {
@@ -308,7 +335,7 @@ function App() {
               const isPipeline = m.content.includes('**Pipeline:');
               return React.createElement('div', {
                 key: m.id,
-                className: `message ${m.role}${isPipeline ? ' pipeline' : ''}`
+                className: `message ${m.role}${isPipeline ? ' pipeline' : ''}${m.streaming ? ' streaming' : ''}`
               },
                 React.createElement('div', { className: 'message-avatar' },
                   m.role === 'user' ? '👤' : (isPipeline ? '🚀' : '🤖')

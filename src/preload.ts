@@ -1,5 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
+type ChunkCallback = (data: { type: 'token' | 'done' | 'error'; content?: string }) => void;
+
 const api = {
   getConversations: () => ipcRenderer.invoke('get-conversations'),
   createConversation: (title: string, mode?: string) => ipcRenderer.invoke('create-conversation', title, mode),
@@ -8,6 +10,12 @@ const api = {
   getMessages: (id: string) => ipcRenderer.invoke('get-messages', id),
   addMessage: (convId: string, role: string, content: string) => ipcRenderer.invoke('add-message', convId, role, content),
   chat: (messages: any[], mode?: string) => ipcRenderer.invoke('chat', messages, mode),
+  startChatStream: (messages: any[], mode: string) => ipcRenderer.send('chat-stream', messages, mode),
+  onChatChunk: (callback: ChunkCallback) => {
+    const handler = (_: any, data: any) => callback(data);
+    ipcRenderer.on('chat:chunk', handler);
+    return () => ipcRenderer.removeListener('chat:chunk', handler);
+  },
   getAgents: () => ipcRenderer.invoke('get-agents'),
   agentTask: (agent: string, task: string) => ipcRenderer.invoke('agent-task', agent, task),
   runPipeline: (type: string, task: string) => ipcRenderer.invoke('run-pipeline', type, task),
